@@ -5,13 +5,14 @@ use axum::{
     http::uri::Uri,
     response::{IntoResponse, Response},
 };
-use axum_htmx::{HxPushUrl, HxReswap, HxRetarget, SwapOption};
 use axum_htmx::extractors::HxRequest;
+use axum_htmx::HxPushUrl;
 
 use kanidm_proto::internal::AppLink;
 
 use crate::https::{extractors::VerifiedClientInformation, middleware::KOpId, ServerState};
 use crate::https::views::errors::HtmxError;
+
 use super::HtmlTemplate;
 
 #[derive(Template)]
@@ -50,15 +51,8 @@ pub(crate) async fn view_apps_get(
 
     Ok(if hx_request {
        (
-            // On the redirect during a login we don't push urls. We set these headers
-            // so that the url is updated, and we swap the correct element.
+            // We set these headers so that the url is updated.
             HxPushUrl(Uri::from_static("/ui/apps")),
-            // Tell htmx that we want to update the body instead. There is no need
-            // set the swap value as it defaults to innerHTML. This is because we came here
-            // from an htmx request so we only need to render the inner portion.
-            HxRetarget("body".to_string()),
-            // We send our own main, replace the existing one.
-            HxReswap(SwapOption::OuterHtml),
             HtmlTemplate(apps_view),
         ).into_response()
     } else {
