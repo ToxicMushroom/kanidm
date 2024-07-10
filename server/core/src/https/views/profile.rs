@@ -3,11 +3,13 @@ use axum::Extension;
 use axum::extract::State;
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
-use axum_htmx::{HxPushUrl, HxRequest, HxReswap, HxRetarget, SwapOption};
-
+use axum_htmx::{HxPushUrl, HxRequest};
+use futures_util::TryFutureExt;
+use kanidm_proto::internal::UserAuthToken;
 use crate::https::extractors::VerifiedClientInformation;
 use crate::https::middleware::KOpId;
 use crate::https::ServerState;
+use crate::https::views::errors::HtmxError;
 use crate::https::views::HtmlTemplate;
 
 #[derive(Template)]
@@ -16,18 +18,28 @@ struct ProfileView {
     profile_partial: ProfilePartialView,
 }
 
-#[derive(Template)]
+#[derive(Template, Clone, Copy)]
 #[template(path = "profile_partial.html")]
 struct ProfilePartialView {
+    can_rw: bool
 }
 
 pub(crate) async fn view_profile_get(
-    State(_state): State<ServerState>,
-    Extension(_kopid): Extension<KOpId>,
+    State(state): State<ServerState>,
+    Extension(kopid): Extension<KOpId>,
     HxRequest(hx_request): HxRequest,
-    VerifiedClientInformation(_client_auth_info): VerifiedClientInformation,
+    VerifiedClientInformation(client_auth_info): VerifiedClientInformation,
 ) -> axum::response::Result<Response> {
-    let profile_partial_view = ProfilePartialView {};
+    let uat: UserAuthToken = state.qe_r_ref.handle_whoami_uat(client_auth_info, kopid.eventid)
+        .map_err(|op_err| HtmxError::new(&kopid, op_err))
+        .await?;
+
+    let time = time::OffsetDateTime::now_utc()+ time::Duration::new(60, 0);
+
+    let can_rw = uat.purpose_readwrite_active(time);
+    let profile_partial_view = ProfilePartialView {
+        can_rw
+    };
     let profile_view = ProfileView {
         profile_partial: profile_partial_view,
     };
@@ -35,7 +47,7 @@ pub(crate) async fn view_profile_get(
     Ok(if hx_request {
         (
             HxPushUrl(Uri::from_static("/ui/profile")),
-            HtmlTemplate(ProfilePartialView {}),
+            HtmlTemplate(profile_partial_view),
         ).into_response()
     } else {
         HtmlTemplate(profile_view).into_response()
