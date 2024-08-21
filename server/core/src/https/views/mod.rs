@@ -37,6 +37,7 @@ pub fn view_router() -> Router<ServerState> {
         .route("/apps", get(apps::view_apps_get))
         .route("/reset", get(reset::view_reset_get))
         .route("/profile", get(profile::view_profile_get))
+        .route("/profile/set", get(profile::view_profile_set))
         .route("/profile/unlock", get(profile::view_profile_unlock_get))
         .route("/logout", get(login::view_logout_get))
         .route("/oauth2", get(oauth2::view_index_get))

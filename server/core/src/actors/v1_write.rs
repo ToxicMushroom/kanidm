@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::iter;
 
 use compact_jwt::JweCompact;
@@ -987,6 +988,56 @@ impl QueryServerWriteV1 {
         );
         self.modify_from_parts(client_auth_info, &uuid_or_name, &proto_ml, filter)
             .await
+    }
+
+    #[instrument(
+        level = "info",
+        name = "get_attributes",
+        skip_all,
+        fields(uuid = ?eventid)
+    )]
+    pub async fn handle_getattributes(
+        &self,
+        client_auth_info: ClientAuthInfo,
+        uuid_or_name: String,
+        filter: Filter<FilterInvalid>,
+        eventid: Uuid,
+    ) -> Result<Vec<(Attribute, Option<BTreeSet<String>>, AttributeProps)>, OperationError> {
+        let ct = duration_from_epoch_now();
+        let mut idms_prox_write = self.idms.proxy_write(ct).await?;
+        let ident = idms_prox_write
+            .validate_client_auth_info_to_ident(client_auth_info, ct)
+            .map_err(|e| {
+                admin_error!(err = ?e, "Invalid identity");
+                e
+            })?;
+        let target_uuid = idms_prox_write
+            .qs_write
+            .name_to_uuid(uuid_or_name.as_str())
+            .map_err(|e| {
+                admin_error!(err = ?e, "Error resolving id to target");
+                e
+            })?;
+        let mut idms_prox_read = self.idms.proxy_read().await?;
+        let person = idms_prox_read
+            .qs_read
+            .impersonate_search_uuid(target_uuid, &ident)?;
+        let qs = &mut idms_prox_write.qs_write;
+        let filter = filter
+            .validate(qs.get_schema())
+            .map_err(OperationError::SchemaViolation)?;
+        let first = idms_prox_write
+            .qs_write
+            .query_writable_attrs(filter, &ident)?;
+
+        let augmented = first
+            .into_iter()
+            .map(move |(attr, props)| {
+                let val = person.get_ava_as_iutf8(attr);
+                (attr, val.cloned(), props)
+            })
+            .collect();
+        Ok(augmented)
     }
 
     #[instrument(

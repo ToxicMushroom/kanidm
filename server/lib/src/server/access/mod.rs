@@ -401,6 +401,38 @@ pub trait AccessControlsTransaction<'a> {
         related_acp
     }
 
+    fn modify_augment_attrs(
+        &self,
+        ident: &Identity,
+        attributes: Vec<Attribute>,
+        el_impostors: &[Arc<EntrySealedCommitted>],
+    ) -> Result<Vec<(Attribute, AttributeProps)>, OperationError> {
+        let related_acp: Vec<_> = self.modify_related_acp(&ident);
+        let mut resultset = vec![];
+
+        if let Some(impostor) = el_impostors.first() {
+            let sync_ag = self.get_sync_agreements();
+            match apply_modify_access(&ident, related_acp.as_slice(), sync_ag, impostor) {
+                ModifyResult::Allow { pres, rem, .. } => {
+                    for attr in attributes {
+                        let x = &attr.to_string();
+                        let attr_str = x.as_str();
+                        resultset.push((
+                            attr,
+                            AttributeProps {
+                                can_write: rem.contains(attr_str),
+                                can_read: pres.contains(attr_str),
+                            },
+                        ))
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(resultset)
+    }
+
     #[instrument(level = "debug", name = "access::modify_allow_operation", skip_all)]
     fn modify_allow_operation(
         &self,
@@ -421,6 +453,7 @@ pub trait AccessControlsTransaction<'a> {
         // Find the acps that relate to the caller, and compile their related
         // target filters.
         let related_acp: Vec<_> = self.modify_related_acp(&me.ident);
+        dbg!(&related_acp);
 
         // build two sets of "requested pres" and "requested rem"
         let requested_pres: BTreeSet<&str> = me
@@ -441,6 +474,9 @@ pub trait AccessControlsTransaction<'a> {
                 _ => None,
             })
             .collect();
+
+        dbg!(&requested_pres);
+        dbg!(&requested_rem);
 
         // Build the set of classes that we to work on, only in terms of "addition". To remove
         // I think we have no limit, but ... william of the future may find a problem with this

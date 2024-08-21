@@ -7,6 +7,12 @@ use crate::prelude::*;
 use crate::value::Value;
 use kanidm_proto::internal::Filter as ProtoFilter;
 
+#[derive(Debug, Copy, Clone)]
+pub struct AttributeProps {
+    pub can_write: bool,
+    pub can_read: bool
+}
+
 lazy_static! {
     /// either recycled or tombstone
     pub static ref FILTER_RECYCLED_OR_TOMBSTONE: ProtoFilter = ProtoFilter::Or(vec![

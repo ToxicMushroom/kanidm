@@ -22,6 +22,25 @@ impl<'a> QueryServerWriteTransaction<'a> {
         }
     }
 
+    pub fn query_writable_attrs(&mut self, filter: Filter<FilterValid>, ident: &Identity) -> Result<Vec<(Attribute, AttributeProps)>, OperationError> {
+        let pre_candidates = self
+            .impersonate_search_valid(filter.clone(), filter.clone(), &ident)
+            .map_err(|e| {
+                admin_error!("modify: error in pre-candidate selection {:?}", e);
+                e
+            })?;
+
+        let access = self.get_accesscontrols();
+        let op_allow = access
+            .modify_augment_attrs(ident, vec![], &pre_candidates.as_slice())
+            .map_err(|e| {
+                admin_error!("Unable to check modify access {:?}", e);
+                e
+            })?;
+
+        Ok(op_allow)
+    }
+
     /// SAFETY: This is unsafe because you need to be careful about how you handle and check
     /// the Ok(None) case which occurs during internal operations, and that you DO NOT re-order
     /// and call multiple pre-applies at the same time, else you can cause DB corruption.
@@ -54,12 +73,14 @@ impl<'a> QueryServerWriteTransaction<'a> {
         // This is now done in the event transform
 
         // This also checks access controls due to use of the impersonation.
+        dbg!(&me);
         let pre_candidates = self
             .impersonate_search_valid(me.filter.clone(), me.filter_orig.clone(), &me.ident)
             .map_err(|e| {
                 admin_error!("modify: error in pre-candidate selection {:?}", e);
                 e
             })?;
+        dbg!(&pre_candidates);
 
         if pre_candidates.is_empty() {
             if me.ident.is_internal() {
