@@ -13,9 +13,11 @@ use kanidmd_lib::{
     idm::server::DomainInfoRead,
     prelude::{OperationError, Uuid},
 };
+use crate::https::views::admin::admin_router;
 
 use crate::https::ServerState;
 
+mod admin;
 mod apps;
 pub(crate) mod constants;
 mod cookies;
@@ -114,7 +116,11 @@ pub fn view_router() -> Router<ServerState> {
         .route("/api/cu_commit", post(reset::commit))
         .layer(HxRequestGuardLayer::new("/ui"));
 
-    Router::new().merge(unguarded_router).merge(guarded_router)
+    let admin_router = admin_router();
+    Router::new()
+        .merge(unguarded_router)
+        .merge(guarded_router)
+        .nest("/admin", admin_router)
 }
 
 /// Serde deserialization decorator to map empty Strings to None,
