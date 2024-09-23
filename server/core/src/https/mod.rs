@@ -137,6 +137,8 @@ pub(crate) fn get_js_files(role: ServerRole) -> Result<Vec<JavaScriptFile>, ()> 
             "external/bootstrap.bundle.min.js",
             "external/htmx.min.1.9.12.js",
             "external/confetti.js",
+            "external/admin.js",
+            "external/confetti.js",
             "external/base64.js",
             "modules/cred_update.mjs",
             "pkhtml.js",
