@@ -28,7 +28,7 @@ use kanidmd_lib::prelude::ClientAuthInfo;
 
 use super::constants::Urls;
 use super::navbar::NavbarCtx;
-use crate::https::extractors::{DomainInfo, DomainInfoRead, VerifiedClientInformation};
+use crate::https::extractors::{AccessInfo, DomainInfo, DomainInfoRead, VerifiedClientInformation};
 use crate::https::middleware::KOpId;
 use crate::https::views::constants::ProfileMenuItems;
 use crate::https::views::cookies;
@@ -41,6 +41,7 @@ use super::UnrecoverableErrorView;
 #[derive(Template)]
 #[template(path = "user_settings.html")]
 struct ProfileView {
+    access_info: AccessInfo,
     navbar_ctx: NavbarCtx,
     profile_partial: CredStatusView,
 }
@@ -962,6 +963,7 @@ fn get_cu_response(
         (
             HxPushUrl(Uri::from_static(Urls::UpdateCredentials.as_ref())),
             ProfileView {
+                access_info: AccessInfo::new(),
                 navbar_ctx: NavbarCtx { domain_info },
                 profile_partial: cred_status_view,
             },
