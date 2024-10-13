@@ -38,6 +38,13 @@ struct UnrecoverableErrorView {
     domain_info: DomainInfoRead,
 }
 
+#[derive(Template)]
+#[template(path = "admin/error_toast.html")]
+struct ErrorToastPartial {
+    err_code: OperationError,
+    operation_id: Uuid,
+}
+
 pub fn view_router() -> Router<ServerState> {
     let mut unguarded_router = Router::new()
         .route(
