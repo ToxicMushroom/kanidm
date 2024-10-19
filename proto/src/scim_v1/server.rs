@@ -268,7 +268,7 @@ pub enum ScimValueKanidm {
     UiHints(Vec<UiHint>),
 }
 
-impl ScimEntryKanidm{
+impl ScimEntryKanidm {
     pub fn attr_str(&self, attr: &Attribute) -> Option<&str> {
         match self.attrs.get(attr) {
             Some(ScimValueKanidm::String(inner_string)) => Some(inner_string.as_str()),
@@ -276,9 +276,7 @@ impl ScimEntryKanidm{
                 debug!("SCIM entry had the {} attribute but it was not a ScimValueKanidm::String type, actual: {:?}", attr, sv);
                 None
             }
-            None => {
-                None
-            }
+            None => None,
         }
     }
 
@@ -289,12 +287,9 @@ impl ScimEntryKanidm{
                 debug!("SCIM entry had the {} attribute but it was not a ScimValueKanidm::Mail type, actual: {:?}", Attribute::Mail, sv);
                 None
             }
-            None => {
-                None
-            }
+            None => None,
         }
     }
-
 
     pub fn attr_references(&self, attr: &Attribute) -> Option<&Vec<ScimReference>> {
         match self.attrs.get(attr) {
@@ -303,9 +298,7 @@ impl ScimEntryKanidm{
                 debug!("SCIM entry had the {} attribute but it was not a ScimValueKanidm::EntryReferences type, actual: {:?}", attr, sv);
                 None
             }
-            None => {
-                None
-            }
+            None => None,
         }
     }
 }

@@ -239,7 +239,7 @@ impl QueryServerReadV1 {
         &self,
         client_auth_info: ClientAuthInfo,
         filter_intent: Filter<FilterInvalid>,
-        eventid: Uuid
+        eventid: Uuid,
     ) -> Result<Vec<ScimEntryKanidm>, OperationError> {
         let ct = duration_from_epoch_now();
         let mut idms_prox_read = self.idms.proxy_read().await?;
@@ -249,10 +249,7 @@ impl QueryServerReadV1 {
                 error!(?err, "Invalid identity");
             })?;
 
-        let filter = filter_all!(f_and!([f_eq(
-            Attribute::Class,
-            EntryClass::Account.into()
-        )]));
+        let filter = filter_all!(f_and!([f_eq(Attribute::Class, EntryClass::Account.into())]));
 
         idms_prox_read
             .qs_read
