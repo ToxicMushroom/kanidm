@@ -3,16 +3,13 @@ use super::ScimOauth2ClaimMapJoinChar;
 use super::ScimSshPublicKey;
 use crate::attribute::Attribute;
 use crate::internal::UiHint;
+use log::debug;
 use scim_proto::ScimEntryHeader;
 use serde::{Deserialize, Serialize};
-use serde_with::{base64, formats, hex::Hex, serde_as, skip_serializing_none, StringWithSeparator};
-use sshkey_attest::proto::PublicKey as SshPublicKey;
-use serde::Serialize;
 use serde_with::{base64, formats, hex::Hex, serde_as, skip_serializing_none};
 use std::collections::{BTreeMap, BTreeSet};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
-use tracing::debug;
 use url::Url;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -77,13 +74,6 @@ pub struct ScimAddress {
     pub region: String,
     pub postal_code: String,
     pub country: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ScimMail {
-    pub primary: bool,
-    pub value: String,
 }
 
 #[derive(Serialize, Debug, Clone, ToSchema)]

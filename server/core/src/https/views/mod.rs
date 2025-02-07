@@ -8,12 +8,12 @@ use axum::{
 
 use axum_htmx::HxRequestGuardLayer;
 
+use crate::https::views::admin::admin_router;
 use constants::Urls;
 use kanidmd_lib::{
     idm::server::DomainInfoRead,
     prelude::{OperationError, Uuid},
 };
-use crate::https::views::admin::admin_router;
 
 use crate::https::ServerState;
 

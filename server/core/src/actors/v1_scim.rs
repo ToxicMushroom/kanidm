@@ -255,7 +255,7 @@ impl QueryServerReadV1 {
             .qs_read
             .impersonate_search_ext(filter_intent, filter, &ident)?
             .into_iter()
-            .map(|entry| entry.to_scim_kanidm())
+            .map(|entry| entry.to_scim_kanidm(&mut idms_prox_read.qs_read))
             .collect()
     }
 }

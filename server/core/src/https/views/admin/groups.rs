@@ -1,7 +1,8 @@
 use crate::https::extractors::{AccessInfo, DomainInfo, VerifiedClientInformation};
 use crate::https::middleware::KOpId;
 use crate::https::views::errors::HtmxError;
-use crate::https::views::{login, HtmlTemplate};
+use crate::https::views::login;
+use crate::https::views::Urls;
 use crate::https::ServerState;
 use askama::Template;
 use axum::extract::{Path, State};
@@ -13,10 +14,14 @@ use axum_htmx::{HxPushUrl, HxRequest};
 use futures_util::TryFutureExt;
 use kanidm_proto::attribute::Attribute;
 
+use crate::https::views::login::LoginDisplayCtx;
+use crate::https::views::navbar::NavbarCtx;
 use kanidm_proto::internal::{OperationError, UserAuthToken};
-use kanidm_proto::scim_v1::server::{ScimEntryKanidm, ScimMail, ScimReference};
+use kanidm_proto::scim_v1::server::{ScimEntryKanidm, ScimReference};
+use kanidm_proto::scim_v1::{ScimEntryGetQuery, ScimMail};
 use kanidmd_lib::constants::EntryClass;
 use kanidmd_lib::filter::{f_and, f_eq, Filter, FC};
+use kanidmd_lib::idm::server::DomainInfoRead;
 use kanidmd_lib::idm::ClientAuthInfo;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -27,6 +32,7 @@ use uuid::Uuid;
 struct GroupsView {
     access_info: AccessInfo,
     partial: GroupsPartialView,
+    navbar_ctx: NavbarCtx,
 }
 
 #[derive(Template)]
@@ -41,6 +47,7 @@ struct GroupInfo {
     uuid: Uuid,
     name: String,
     spn: String,
+    description: Option<String>,
     entry_manager: Option<String>,
     acp: GroupACP,
     mails: Vec<ScimMail>,
@@ -57,6 +64,7 @@ struct GroupACP {
 struct GroupCreateView {
     access_info: AccessInfo,
     partial: GroupCreatePartialView,
+    navbar_ctx: NavbarCtx,
 }
 
 #[derive(Template)]
@@ -78,22 +86,24 @@ pub(crate) async fn view_group_create_get(
     HxRequest(is_htmx): HxRequest,
     Extension(kopid): Extension<KOpId>,
     VerifiedClientInformation(client_auth_info): VerifiedClientInformation,
+    DomainInfo(domain_info): DomainInfo,
 ) -> axum::response::Result<Response> {
-    let can_rw = get_can_rw(&state, &kopid, &client_auth_info).await?;
+    let can_rw = get_can_rw(&state, &kopid, &client_auth_info, domain_info.clone()).await?;
 
-    let groups = get_groups_info(state, &kopid, client_auth_info).await?;
+    let groups = get_groups_info(state, &kopid, client_auth_info, domain_info.clone()).await?;
     let groups_partial = GroupCreatePartialView { can_rw, groups };
 
     let push_url = HxPushUrl(Uri::from_static("/ui/admin/group/create"));
     Ok(if is_htmx {
-        (push_url, HtmlTemplate(groups_partial)).into_response()
+        (push_url, groups_partial).into_response()
     } else {
         (
             push_url,
-            HtmlTemplate(GroupCreateView {
+            GroupCreateView {
                 access_info: AccessInfo::new(),
                 partial: groups_partial,
-            }),
+                navbar_ctx: NavbarCtx { domain_info },
+            },
         )
             .into_response()
     })
@@ -105,6 +115,7 @@ pub(crate) async fn view_group_delete_post(
     Extension(kopid): Extension<KOpId>,
     Path(group_uuid): Path<Uuid>,
     VerifiedClientInformation(client_auth_info): VerifiedClientInformation,
+    DomainInfo(domain_info): DomainInfo,
 ) -> axum::response::Result<Response> {
     dbg!(group_uuid);
     view_groups_get(
@@ -112,6 +123,7 @@ pub(crate) async fn view_group_delete_post(
         HxRequest(is_htmx),
         Extension(kopid),
         VerifiedClientInformation(client_auth_info),
+        DomainInfo(domain_info),
     )
     .await
 }
@@ -209,9 +221,10 @@ pub(crate) async fn view_group_edit_get(
     Extension(kopid): Extension<KOpId>,
     VerifiedClientInformation(client_auth_info): VerifiedClientInformation,
     Path(uuid): Path<Uuid>,
+    DomainInfo(domain_info): DomainInfo,
 ) -> axum::response::Result<Response> {
-    let can_rw = get_can_rw(&state, &kopid, &client_auth_info).await?;
-    let group = get_group_info(uuid, state, &kopid, client_auth_info).await?;
+    let can_rw = get_can_rw(&state, &kopid, &client_auth_info, domain_info.clone()).await?;
+    let group = get_group_info(uuid, state, &kopid, client_auth_info, domain_info.clone()).await?;
     let groups_partial = GroupViewPartial {
         can_rw,
         can_edit: true,
@@ -222,14 +235,15 @@ pub(crate) async fn view_group_edit_get(
     let src = path_string.clone();
     let push_url = HxPushUrl(Uri::from_str(src.as_str()).expect("T"));
     Ok(if is_htmx {
-        (push_url, HtmlTemplate(groups_partial)).into_response()
+        (push_url, groups_partial).into_response()
     } else {
         (
             push_url,
-            HtmlTemplate(GroupView {
+            GroupView {
                 access_info: AccessInfo::new(),
                 partial: groups_partial,
-            }),
+                navbar_ctx: NavbarCtx { domain_info },
+            },
         )
             .into_response()
     })
@@ -240,6 +254,7 @@ pub(crate) async fn view_group_edit_get(
 struct GroupView {
     access_info: AccessInfo,
     partial: GroupViewPartial,
+    navbar_ctx: NavbarCtx,
 }
 
 #[derive(Template)]
@@ -256,9 +271,10 @@ pub(crate) async fn view_group_view_get(
     Extension(kopid): Extension<KOpId>,
     VerifiedClientInformation(client_auth_info): VerifiedClientInformation,
     Path(uuid): Path<Uuid>,
+    DomainInfo(domain_info): DomainInfo,
 ) -> axum::response::Result<Response> {
-    let can_rw = get_can_rw(&state, &kopid, &client_auth_info).await?;
-    let group = get_group_info(uuid, state, &kopid, client_auth_info).await?;
+    let can_rw = get_can_rw(&state, &kopid, &client_auth_info, domain_info.clone()).await?;
+    let group = get_group_info(uuid, state, &kopid, client_auth_info, domain_info.clone()).await?;
     let groups_partial = GroupViewPartial {
         can_rw,
         can_edit: false,
@@ -269,14 +285,15 @@ pub(crate) async fn view_group_view_get(
     let src = path_string.clone();
     let push_url = HxPushUrl(Uri::from_str(src.as_str()).expect("T"));
     Ok(if is_htmx {
-        (push_url, HtmlTemplate(groups_partial)).into_response()
+        (push_url, groups_partial).into_response()
     } else {
         (
             push_url,
-            HtmlTemplate(GroupView {
+            GroupView {
                 access_info: AccessInfo::new(),
                 partial: groups_partial,
-            }),
+                navbar_ctx: NavbarCtx { domain_info },
+            },
         )
             .into_response()
     })
@@ -287,22 +304,24 @@ pub(crate) async fn view_groups_get(
     HxRequest(is_htmx): HxRequest,
     Extension(kopid): Extension<KOpId>,
     VerifiedClientInformation(client_auth_info): VerifiedClientInformation,
+    DomainInfo(domain_info): DomainInfo,
 ) -> axum::response::Result<Response> {
-    let can_rw = get_can_rw(&state, &kopid, &client_auth_info).await?;
+    let can_rw = get_can_rw(&state, &kopid, &client_auth_info, domain_info.clone()).await?;
 
-    let groups = get_groups_info(state, &kopid, client_auth_info).await?;
+    let groups = get_groups_info(state, &kopid, client_auth_info, domain_info.clone()).await?;
     let groups_partial = GroupsPartialView { can_rw, groups };
 
     let push_url = HxPushUrl(Uri::from_static("/ui/admin/groups"));
     Ok(if is_htmx {
-        (push_url, HtmlTemplate(groups_partial)).into_response()
+        (push_url, groups_partial).into_response()
     } else {
         (
             push_url,
-            HtmlTemplate(GroupsView {
+            GroupsView {
                 access_info: AccessInfo::new(),
                 partial: groups_partial,
-            }),
+                navbar_ctx: NavbarCtx { domain_info },
+            },
         )
             .into_response()
     })
@@ -319,22 +338,41 @@ pub(crate) async fn view_groups_unlock_get(
     let referrer = match headers.get(header::REFERER) {
         Some(header_value) => header_value.to_str().map_err(|x| {
             warn!("referer header couldn't be converted to string: {x}");
-            HtmxError::OperationError(kopid.eventid, OperationError::InvalidRequestState)
+            HtmxError::OperationError(
+                kopid.eventid,
+                OperationError::InvalidRequestState,
+                domain_info.clone(),
+            )
         })?,
         None => "/ui/admin/groups",
     };
-    login::view_reauth_get(state, client_auth_info, kopid, jar, referrer, domain_info).await
+
+    Ok(login::view_reauth_get(
+        state,
+        client_auth_info,
+        kopid,
+        jar,
+        referrer,
+        LoginDisplayCtx {
+            domain_info,
+            reauth: None,
+            oauth2: None,
+            error: None,
+        },
+    )
+    .await)
 }
 
 async fn get_can_rw(
     state: &ServerState,
     kopid: &KOpId,
     client_auth_info: &ClientAuthInfo,
+    domain_info: DomainInfoRead,
 ) -> Result<bool, ErrorResponse> {
     let uat: UserAuthToken = state
         .qe_r_ref
         .handle_whoami_uat(client_auth_info.clone(), kopid.eventid)
-        .map_err(|op_err| HtmxError::new(&kopid, op_err))
+        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info))
         .await?;
 
     let time = time::OffsetDateTime::now_utc() + time::Duration::new(60, 0);
@@ -348,17 +386,27 @@ async fn get_group_info(
     state: ServerState,
     kopid: &KOpId,
     client_auth_info: ClientAuthInfo,
+    domain_info: DomainInfoRead,
 ) -> Result<GroupInfo, ErrorResponse> {
     let scim_entry: ScimEntryKanidm = state
         .qe_r_ref
-        .scim_entry_id_get(client_auth_info.clone(), kopid.eventid, uuid.to_string())
-        .map_err(|op_err| HtmxError::new(&kopid, op_err))
+        .scim_entry_id_get(
+            client_auth_info.clone(),
+            kopid.eventid,
+            uuid.to_string(),
+            EntryClass::Group,
+            ScimEntryGetQuery {
+                attributes: None,
+                ext_access_check: false,
+            },
+        )
+        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
         .await?;
 
     if let Some(group_info) = scimentry_into_groupinfo(&scim_entry) {
         Ok(group_info)
     } else {
-        Err(HtmxError::new(kopid, OperationError::InvalidState).into())
+        Err(HtmxError::new(kopid, OperationError::InvalidState, domain_info.clone()).into())
     }
 }
 
@@ -366,12 +414,13 @@ async fn get_groups_info(
     state: ServerState,
     kopid: &KOpId,
     client_auth_info: ClientAuthInfo,
+    domain_info: DomainInfoRead,
 ) -> Result<Vec<GroupInfo>, ErrorResponse> {
     let filter = filter_all!(f_and!([f_eq(Attribute::Class, EntryClass::Group.into())]));
     let base: Vec<_> = state
         .qe_r_ref
         .scim_entry_search(client_auth_info.clone(), filter, kopid.eventid)
-        .map_err(|op_err| HtmxError::new(&kopid, op_err))
+        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
         .await?;
 
     // TODO: inefficient to sort here
@@ -388,6 +437,9 @@ async fn get_groups_info(
 fn scimentry_into_groupinfo(scim_entry: &ScimEntryKanidm) -> Option<GroupInfo> {
     let name = scim_entry.attr_str(&Attribute::Name)?.to_string();
     let spn = scim_entry.attr_str(&Attribute::Spn)?.to_string();
+    let description = scim_entry
+        .attr_str(&Attribute::Description)
+        .map(|t| t.to_string());
     let entry_manager = scim_entry
         .attr_str(&Attribute::EntryManagedBy)
         .map(|t| t.to_string());
@@ -401,6 +453,7 @@ fn scimentry_into_groupinfo(scim_entry: &ScimEntryKanidm) -> Option<GroupInfo> {
         uuid: scim_entry.header.id,
         name,
         spn,
+        description,
         entry_manager,
         acp: GroupACP { enabled: false },
         mails,

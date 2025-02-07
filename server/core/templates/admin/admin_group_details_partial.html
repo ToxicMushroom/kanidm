@@ -22,6 +22,12 @@
 
     (% call string_attr("Name", "name", group.name, true) %)
 
+    (% if let Some(description) = group.description %)
+        (% call string_attr("Description", "description", description, true) %)
+    (% else %)
+        (% call string_attr("Description", "description", "none", true) %)
+    (% endif %)
+
     (% if let Some(entry_manager) = group.entry_manager %)
         (% call string_attr("Entry Manager", "entry_manager", entry_manager, true) %)
     (% else %)

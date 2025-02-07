@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect, Response};
-use axum_htmx::{HxReswap, HxRetarget, SwapOption};
+use axum_htmx::{HxEvent, HxResponseTrigger, HxReswap, HxRetarget, SwapOption};
 use kanidmd_lib::idm::server::DomainInfoRead;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -8,7 +8,7 @@ use uuid::Uuid;
 use kanidm_proto::internal::OperationError;
 
 use crate::https::middleware::KOpId;
-use crate::https::views::{ErrorToastPartial, HtmlTemplate, UnrecoverableErrorView};
+use crate::https::views::{ErrorToastPartial, UnrecoverableErrorView};
 // #[derive(Template)]
 // #[template(path = "recoverable_error_partial.html")]
 // struct ErrorPartialView {
@@ -50,10 +50,10 @@ impl IntoResponse for HtmxError {
                             HxReswap(SwapOption::BeforeEnd),
                             (
                                 StatusCode::FORBIDDEN,
-                                HtmlTemplate(ErrorToastPartial {
+                                ErrorToastPartial {
                                     err_code: inner,
                                     operation_id: kopid,
-                                }),
+                                },
                             )
                                 .into_response(),
                         )
