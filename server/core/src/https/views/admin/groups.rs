@@ -93,7 +93,7 @@ pub(crate) async fn view_group_view_get(
         get_group_info(uuid, state.clone(), &kopid, client_auth_info.clone()).await?;
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let time = time::OffsetDateTime::now_utc() + time::Duration::new(60, 0);
     let can_rw = uat.purpose_readwrite_active(time);
@@ -105,7 +105,7 @@ pub(crate) async fn view_group_view_get(
 
     let path_string = format!("/ui/admin/group/{uuid}/view");
     let uri = Uri::from_str(path_string.as_str())
-        .map_err(|_| HtmxError::new(&kopid, OperationError::Backend, domain_info.clone()))?;
+        .map_err(|_| HtmxError::error_page(&kopid, OperationError::Backend, domain_info.clone()))?;
     let push_url = HxPushUrl(uri);
     Ok(if is_htmx {
         (push_url, group_partial).into_response()
@@ -132,7 +132,7 @@ pub(crate) async fn view_groups_get(
     let groups_partial = GroupsPartialView { groups };
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let push_url = HxPushUrl(Uri::from_static("/ui/admin/groups"));
     Ok(if is_htmx {
@@ -249,12 +249,12 @@ pub(crate) async fn edit_group(
         attrs,
     }
     .try_into()
-    .map_err(|_| HtmxError::new(&kopid, OperationError::Backend, domain_info.clone()))?;
+    .map_err(|_| HtmxError::error_page(&kopid, OperationError::Backend, domain_info.clone()))?;
 
     state
         .qe_w_ref
         .handle_scim_entry_put(client_auth_info.clone(), kopid.eventid, generic)
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))
         .await?;
 
     // return floating notification: saved/failed
@@ -305,7 +305,7 @@ pub(crate) async fn add_member(
             EntryClass::Group,
             get_query.clone(),
         )
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))
         .await?;
     state
         .qe_w_ref
@@ -317,7 +317,7 @@ pub(crate) async fn add_member(
             filter,
             kopid.eventid,
         )
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))
         .await?;
 
     let after = state
@@ -329,7 +329,7 @@ pub(crate) async fn add_member(
             EntryClass::Group,
             get_query,
         )
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))
         .await?;
 
     let before_len = if let Some(ScimValueKanidm::EntryReferences(members_before)) =
@@ -357,7 +357,7 @@ pub(crate) async fn add_member(
                 EntryClass::Object,
                 get_member_query,
             )
-            .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
+            .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))
             .await?;
 
         let Some(ScimValueKanidm::String(added_member_spn)) =
@@ -407,7 +407,7 @@ pub(crate) async fn remove_member(
             filter,
             kopid.eventid,
         )
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))
         .await?;
 
     // return floating notification: saved/failed

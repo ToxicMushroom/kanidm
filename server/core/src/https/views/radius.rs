@@ -37,7 +37,7 @@ pub(crate) async fn view_radius_get(
 ) -> axum::response::Result<Response> {
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let time = time::OffsetDateTime::now_utc() + time::Duration::new(60, 0);
     let can_rw = uat.purpose_readwrite_active(time);
@@ -69,7 +69,7 @@ pub(crate) async fn view_radius_get(
         .qe_r_ref
         .handle_internalradiusread(client_auth_info.clone(), uat.spn.clone(), kopid.eventid)
         .await
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     Ok(ProfileView {
         navbar_ctx: NavbarCtx::new(domain_info, &uat.ui_hints),
@@ -90,13 +90,13 @@ pub(crate) async fn view_radius_post(
     let uat_client_auth_info = client_auth_info.clone();
     let uat: &UserAuthToken = uat_client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let radius_password = state
         .qe_w_ref
         .handle_regenerateradius(client_auth_info, uat.uuid.to_string(), kopid.eventid)
         .await
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     Ok(RadiusPartialView {
         menu_active_item: ProfileMenuItems::Radius,

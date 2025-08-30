@@ -48,7 +48,7 @@ pub(crate) async fn view_enrol_get(
 ) -> axum::response::Result<Response> {
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let time = time::OffsetDateTime::now_utc() + time::Duration::new(60, 0);
     let can_rw = uat.purpose_readwrite_active(time);
@@ -87,7 +87,7 @@ pub(crate) async fn view_enrol_get(
             kopid.eventid,
         )
         .await
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let secret = cu_intent.token;
 

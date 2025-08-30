@@ -15,7 +15,7 @@ use axum_extra::extract::Form;
 use axum_htmx::{HxEvent, HxPushUrl, HxResponseTrigger};
 use futures_util::TryFutureExt;
 use kanidm_proto::attribute::Attribute;
-use kanidm_proto::internal::{OperationError, UserAuthToken};
+use kanidm_proto::internal::{OperationError, PluginError, UserAuthToken};
 use kanidm_proto::scim_v1::client::ScimEntryPutKanidm;
 use kanidm_proto::scim_v1::server::{ScimEffectiveAccess, ScimPerson, ScimValueKanidm};
 use kanidm_proto::scim_v1::ScimMail;
@@ -151,7 +151,7 @@ pub(crate) async fn view_profile_diff_start_save_post(
 ) -> axum::response::Result<Response> {
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let time = time::OffsetDateTime::now_utc() + time::Duration::new(60, 0);
     let can_rw = uat.purpose_readwrite_active(time);
@@ -230,7 +230,7 @@ pub(crate) async fn view_profile_diff_confirm_save_post(
 ) -> axum::response::Result<Response> {
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let mut attrs = BTreeMap::<Attribute, Option<ScimValueKanidm>>::new();
 
@@ -280,13 +280,18 @@ pub(crate) async fn view_profile_diff_confirm_save_post(
         attrs,
     }
     .try_into()
-    .map_err(|_| HtmxError::new(&kopid, OperationError::Backend, domain_info.clone()))?;
+    .map_err(|_| HtmxError::error_page(&kopid, OperationError::Backend, domain_info.clone()))?;
 
     // TODO: Use returned KanidmScimPerson below instead of view_profile_get.
     state
         .qe_w_ref
         .handle_scim_entry_put(client_auth_info.clone(), kopid.eventid, generic)
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))
+        .map_err(|op_err| match op_err {
+            OperationError::Plugin(PluginError::AttrUnique(_)) => {
+                HtmxError::notification(&kopid, op_err, domain_info.clone())
+            }
+            _ => HtmxError::error_page(&kopid, op_err, domain_info.clone()),
+        })
         .await?;
 
     match view_profile_get(

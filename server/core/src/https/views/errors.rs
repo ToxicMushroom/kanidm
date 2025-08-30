@@ -21,20 +21,39 @@ use crate::https::views::{ErrorToastPartial, UnrecoverableErrorView};
 /// The web app's top level error type, this takes an `OperationError` and converts it into a HTTP response.
 #[derive(Debug, ToSchema)]
 pub(crate) enum HtmxError {
-    /// Something went wrong when doing things.
-    OperationError(Uuid, OperationError, DomainInfoRead),
+    /// For creating full page error screens on the webpage
+    ErrorPage(HtmxErrorInfo),
+    Notification(HtmxErrorInfo),
 }
+#[derive(Debug)]
+pub(crate) struct HtmxErrorInfo(Uuid, OperationError, DomainInfoRead);
 
 impl HtmxError {
-    pub(crate) fn new(kopid: &KOpId, operr: OperationError, domain_info: DomainInfoRead) -> Self {
-        HtmxError::OperationError(kopid.eventid, operr, domain_info)
+    pub(crate) fn error_page(
+        kopid: &KOpId,
+        operr: OperationError,
+        domain_info: DomainInfoRead,
+    ) -> Self {
+        HtmxError::ErrorPage(HtmxErrorInfo(kopid.eventid, operr, domain_info))
+    }
+    pub(crate) fn notification(
+        kopid: &KOpId,
+        operr: OperationError,
+        domain_info: DomainInfoRead,
+    ) -> Self {
+        HtmxError::Notification(HtmxErrorInfo(kopid.eventid, operr, domain_info))
     }
 }
 
 impl IntoResponse for HtmxError {
     fn into_response(self) -> Response {
         match self {
-            HtmxError::OperationError(kopid, inner, domain_info) => {
+            HtmxError::Notification(HtmxErrorInfo(eventid, operr, _)) => (ErrorToastPartial {
+                err_code: operr,
+                operation_id: eventid,
+            })
+            .into_response(),
+            HtmxError::ErrorPage(HtmxErrorInfo(eventid, inner, domain_info)) => {
                 let body = serde_json::to_string(&inner).unwrap_or(inner.to_string());
                 match &inner {
                     OperationError::NotAuthenticated
@@ -52,7 +71,7 @@ impl IntoResponse for HtmxError {
                                 StatusCode::FORBIDDEN,
                                 ErrorToastPartial {
                                     err_code: inner,
-                                    operation_id: kopid,
+                                    operation_id: eventid,
                                 },
                             )
                                 .into_response(),
@@ -74,7 +93,7 @@ impl IntoResponse for HtmxError {
                         HxReswap(SwapOption::OuterHtml),
                         UnrecoverableErrorView {
                             err_code: inner,
-                            operation_id: kopid,
+                            operation_id: eventid,
                             domain_info,
                         },
                     )

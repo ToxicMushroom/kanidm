@@ -42,10 +42,10 @@ pub(crate) async fn view_apps_get(
         .qe_r_ref
         .handle_list_applinks(client_auth_info.clone(), kopid.eventid)
         .await
-        .map_err(|old| HtmxError::new(&kopid, old, domain_info.clone()))?;
+        .map_err(|old| HtmxError::error_page(&kopid, old, domain_info.clone()))?;
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let apps_partial = AppsPartialView { apps: app_links };
 

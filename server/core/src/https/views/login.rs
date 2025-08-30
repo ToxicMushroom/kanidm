@@ -201,7 +201,7 @@ pub async fn view_reauth_to_referer_get(
 ) -> Result<Response, HtmxError> {
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let referer = headers.get("Referer").and_then(|hv| hv.to_str().ok());
 
@@ -709,7 +709,8 @@ pub async fn view_login_passkey_post(
         }
         Err(e) => {
             error!(err = ?e, "Unable to deserialize credential submission");
-            HtmxError::new(&kopid, OperationError::SerdeJsonError, domain_info).into_response()
+            HtmxError::error_page(&kopid, OperationError::SerdeJsonError, domain_info)
+                .into_response()
         }
     }
 }

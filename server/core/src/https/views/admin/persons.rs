@@ -78,11 +78,11 @@ pub(crate) async fn view_person_view_get(
     };
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
 
     let path_string = format!("/ui/admin/person/{uuid}/view");
     let uri = Uri::from_str(path_string.as_str())
-        .map_err(|_| HtmxError::new(&kopid, OperationError::Backend, domain_info.clone()))?;
+        .map_err(|_| HtmxError::error_page(&kopid, OperationError::Backend, domain_info.clone()))?;
     let push_url = HxPushUrl(uri);
     Ok(if is_htmx {
         (push_url, person_partial).into_response()
@@ -109,7 +109,7 @@ pub(crate) async fn view_persons_get(
     let persons_partial = PersonsPartialView { persons };
     let uat: &UserAuthToken = client_auth_info
         .pre_validated_uat()
-        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+        .map_err(|op_err| HtmxError::error_page(&kopid, op_err, domain_info.clone()))?;
     let push_url = HxPushUrl(Uri::from_static("/ui/admin/persons"));
     Ok(if is_htmx {
         (push_url, persons_partial).into_response()
