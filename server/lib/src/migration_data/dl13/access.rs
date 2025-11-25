@@ -989,6 +989,28 @@ lazy_static! {
 }
 
 lazy_static! {
+    pub static ref IDM_ACP_PEOPLE_SELF_WRITE_IMAGE_V1: BuiltinAcp = BuiltinAcp {
+        classes: vec![
+            EntryClass::Object,
+            EntryClass::AccessControlProfile,
+            EntryClass::AccessControlModify,
+        ],
+        name: "idm_acp_people_self_write_image",
+        uuid: UUID_IDM_ACP_PEOPLE_SELF_WRITE_IMAGE,
+        description: "Builtin IDM Control for self write of image for people accounts.",
+        receiver: BuiltinAcpReceiver::Group(vec![UUID_IDM_PEOPLE_SELF_IMAGE_WRITE]),
+        target: BuiltinAcpTarget::Filter(ProtoFilter::And(vec![
+            match_class_filter!(EntryClass::Person).clone(),
+            match_class_filter!(EntryClass::Account).clone(),
+            ProtoFilter::SelfUuid,
+        ])),
+        modify_removed_attrs: vec![Attribute::Image],
+        modify_present_attrs: vec![Attribute::Image],
+        ..Default::default()
+    };
+}
+
+lazy_static! {
     pub static ref IDM_ACP_SELF_READ_V1: BuiltinAcp = BuiltinAcp {
         name: "idm_acp_self_read",
         uuid: UUID_IDM_ACP_SELF_READ,

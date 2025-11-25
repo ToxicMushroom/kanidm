@@ -1,4 +1,4 @@
-use crate::{ClientError, KanidmClient};
+use crate::{try_part_from_imagevalue, ClientError, KanidmClient};
 use kanidm_proto::attribute::Attribute;
 use kanidm_proto::constants::{
     ATTR_DISPLAYNAME, ATTR_KEY_ACTION_REVOKE, ATTR_KEY_ACTION_ROTATE, ATTR_NAME,
@@ -214,51 +214,11 @@ impl KanidmClient {
         id: &str,
         image: ImageValue,
     ) -> Result<(), ClientError> {
-        let file_content_type = image.filetype.as_content_type_str();
-
-        let file_data = match multipart::Part::bytes(image.contents.clone())
-            .file_name(image.filename)
-            .mime_str(file_content_type)
-        {
-            Ok(part) => part,
-            Err(err) => {
-                error!(
-                    "Failed to generate multipart body from image data: {:}",
-                    err
-                );
-                return Err(ClientError::SystemError);
-            }
-        };
-
-        let form = multipart::Form::new().part("image", file_data);
+        let form = multipart::Form::new().part("image", try_part_from_imagevalue(image)?);
 
         // send it
-        let response = self
-            .client
-            .post(self.make_url(&format!("/v1/oauth2/{id}/_image")))
-            .multipart(form);
-
-        let response = {
-            let tguard = self.bearer_token.read().await;
-            if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
-            } else {
-                response
-            }
-        };
-        let response = response
-            .send()
+        self.perform_multipart_post_request(format!("/v1/oauth2/{id}/_image").as_str(), form)
             .await
-            .map_err(|err| self.handle_response_error(err))?;
-        self.expect_version(&response).await;
-
-        let opid = self.get_kopid_from_response(&response);
-
-        self.ok_or_clienterror(&opid, response)
-            .await?
-            .json()
-            .await
-            .map_err(|e| ClientError::JsonDecode(e, opid))
     }
 
     pub async fn idm_oauth2_rs_enable_pkce(&self, id: &str) -> Result<(), ClientError> {

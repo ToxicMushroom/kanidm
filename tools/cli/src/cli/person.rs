@@ -1,11 +1,14 @@
 use crate::common::try_expire_at_from_string;
 use std::fmt::{self, Debug};
+use std::fs::read;
 use std::str::FromStr;
 
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Input, Password, Select};
 use kanidm_client::ClientError::Http as ClientErrorHttp;
 use kanidm_client::KanidmClient;
+use anyhow::{Context, Error};
+use kanidm_proto::internal::ImageValue;
 use kanidm_proto::attribute::Attribute;
 use kanidm_proto::cli::OpType;
 use kanidm_proto::constants::{ATTR_ACCOUNT_EXPIRE, ATTR_ACCOUNT_VALID_FROM, ATTR_GIDNUMBER};
@@ -28,8 +31,8 @@ use uuid::Uuid;
 use crate::webauthn::get_authenticator;
 use crate::{
     handle_client_error, password_prompt, AccountCertificate, AccountCredential, AccountRadius,
-    AccountSsh, AccountUserAuthToken, AccountValidity, KanidmClientParser, OutputMode, PersonOpt,
-    PersonPosix,
+    AccountSsh, AccountUserAuthToken, AccountValidity, ImageOpts, KanidmClientParser, OutputMode,
+    PersonOpt, PersonPosix,
 };
 
 impl PersonOpt {
@@ -288,6 +291,72 @@ impl PersonOpt {
                     .await
                 {
                     Ok(()) => println!("Success"),
+                    Err(e) => handle_client_error(e, opt.output_mode),
+                }
+            }
+            PersonOpt::SetImage(iopts) => {
+                let ImageOpts {
+                    nopt,
+                    path,
+                    image_type,
+                } = iopts;
+                let img_res: Result<ImageValue, Error> = (move || {
+                    let file_name = path
+                        .file_name()
+                        .context("Please pass a file")?
+                        .to_str()
+                        .context("Path contains non utf-8")?
+                        .to_string();
+
+                    let image_type = match image_type {
+                        Some(val) => val.clone(),
+                        None => {
+                            path
+                                .extension().context("Path has no extension so we can't infer the imageType, or you could pass the optional imageType argument yourself.")?
+                                .to_str().context("Path contains invalid utf-8")?
+                                .try_into()
+                                .map_err(Error::msg)?
+                        }
+                    };
+
+                    let read_res = read(path);
+                    match read_res {
+                        Ok(data) => Ok(ImageValue::new(file_name, image_type, data)),
+                        Err(err) => {
+                            if opt.debug {
+                                eprintln!(
+                                    "{}",
+                                    kanidm_lib_file_permissions::diagnose_path(path.as_ref())
+                                );
+                            }
+                            Err(err).context(format!("Failed to read file at '{}'", path.display()))
+                        }
+                    }
+                })();
+
+                let img = match img_res {
+                    Ok(img) => img,
+                    Err(err) => {
+                        eprintln!("{err:?}");
+                        return;
+                    }
+                };
+
+                let client = opt.to_client(OpType::Write).await;
+
+                match client
+                    .idm_person_update_image(nopt.name.as_str(), img)
+                    .await
+                {
+                    Ok(_) => opt.output_mode.print_message("Success"),
+                    Err(e) => handle_client_error(e, opt.output_mode),
+                }
+            }
+            PersonOpt::RemoveImage(nopt) => {
+                let client = opt.to_client(OpType::Write).await;
+
+                match client.idm_person_delete_image(nopt.name.as_str()).await {
+                    Ok(_) => opt.output_mode.print_message("Success"),
                     Err(e) => handle_client_error(e, opt.output_mode),
                 }
             }

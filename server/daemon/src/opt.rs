@@ -191,7 +191,7 @@ enum KanidmdOpt {
         #[clap(subcommand)]
         commands: DbCommands,
     },
-    /// Change domain settings
+    /// Domain upgrade-check, migration and settings.
     #[clap(name = "domain")]
     DomainSettings {
         #[clap(subcommand)]

@@ -9,7 +9,7 @@ use super::v1::{
 use super::ServerState;
 
 use crate::https::extractors::VerifiedClientInformation;
-use axum::extract::{Path, State};
+use axum::extract::{Multipart, Path, State};
 use axum::{Extension, Json};
 use kanidm_proto::internal::{ImageType, ImageValue, Oauth2ClaimMapJoin};
 use kanidm_proto::v1::Entry as ProtoEntry;
@@ -506,44 +506,9 @@ pub(crate) async fn oauth2_id_image_post(
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<()>, WebError> {
     // because we might not get an image
-    let mut image: Option<ImageValue> = None;
-
-    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
-        let filename = field.file_name().map(|f| f.to_string()).clone();
-        if let Some(filename) = filename {
-            let content_type = field.content_type().map(|f| f.to_string()).clone();
-
-            let content_type = match content_type {
-                Some(val) => {
-                    if VALID_IMAGE_UPLOAD_CONTENT_TYPES.contains(&val.as_str()) {
-                        val
-                    } else {
-                        debug!("Invalid content type: {}", val);
-                        return Err(OperationError::InvalidRequestState.into());
-                    }
-                }
-                None => {
-                    debug!("No content type header provided");
-                    return Err(OperationError::InvalidRequestState.into());
-                }
-            };
-            let data = match field.bytes().await {
-                Ok(val) => val,
-                Err(_e) => return Err(OperationError::InvalidRequestState.into()),
-            };
-
-            let filetype = match ImageType::try_from_content_type(&content_type) {
-                Ok(val) => val,
-                Err(_err) => return Err(OperationError::InvalidRequestState.into()),
-            };
-
-            image = Some(ImageValue {
-                filetype,
-                filename: filename.to_string(),
-                contents: data.to_vec(),
-            });
-        };
-    }
+    let image = image_from_multipart(&mut multipart)
+        .await
+        .map_err(|op_err| WebError::from(op_err))?;
 
     match image {
         Some(image) => {
@@ -568,4 +533,48 @@ pub(crate) async fn oauth2_id_image_post(
             "No image included, did you mean to use the DELETE method?".to_string(),
         ))),
     }
+}
+
+pub async fn image_from_multipart(
+    multipart: &mut Multipart,
+) -> Result<Option<ImageValue>, OperationError> {
+    let mut image: Option<ImageValue> = None;
+
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        let filename = field.file_name().map(|f| f.to_string()).clone();
+        if let Some(filename) = filename {
+            let content_type = field.content_type().map(|f| f.to_string()).clone();
+
+            let content_type = match content_type {
+                Some(val) => {
+                    if VALID_IMAGE_UPLOAD_CONTENT_TYPES.contains(&val.as_str()) {
+                        val
+                    } else {
+                        debug!("Invalid content type: {}", val);
+                        return Err(OperationError::InvalidRequestState);
+                    }
+                }
+                None => {
+                    debug!("No content type header provided");
+                    return Err(OperationError::InvalidRequestState);
+                }
+            };
+            let data = match field.bytes().await {
+                Ok(val) => val,
+                Err(_e) => return Err(OperationError::InvalidRequestState),
+            };
+
+            let filetype = match ImageType::try_from_content_type(&content_type) {
+                Ok(val) => val,
+                Err(_err) => return Err(OperationError::InvalidRequestState),
+            };
+
+            image = Some(ImageValue {
+                filetype,
+                filename: filename.to_string(),
+                contents: data.to_vec(),
+            });
+        };
+    }
+    Ok(image)
 }

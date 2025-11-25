@@ -225,6 +225,7 @@ pub fn phase_6_builtin_non_admin_entries() -> Result<Vec<EntryInitNew>, Operatio
             .clone()
             .try_into()?,
         IDM_PEOPLE_SELF_MAIL_WRITE_DL7.clone().try_into()?,
+        IDM_PEOPLE_SELF_IMAGE_WRITE.clone().try_into()?,
         BUILTIN_GROUP_CLIENT_CERTIFICATE_ADMINS_DL7
             .clone()
             .try_into()?,
@@ -256,6 +257,7 @@ pub fn phase_7_builtin_access_control_profiles() -> Vec<EntryInitNew> {
         IDM_ACP_RADIUS_SERVERS_V1.clone().into(),
         IDM_ACP_RADIUS_SECRET_MANAGE_V1.clone().into(),
         IDM_ACP_PEOPLE_SELF_WRITE_MAIL_V1.clone().into(),
+        IDM_ACP_PEOPLE_SELF_WRITE_IMAGE_V1.clone().into(),
         IDM_ACP_ACCOUNT_SELF_WRITE_V1.clone().into(),
         IDM_ACP_ALL_ACCOUNTS_POSIX_READ_V1.clone().into(),
         IDM_ACP_SYSTEM_CONFIG_ACCOUNT_POLICY_MANAGE_V1

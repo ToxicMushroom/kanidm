@@ -313,6 +313,15 @@ lazy_static! {
         ..Default::default()
     };
 
+    /// Self-write of mail
+    pub static ref IDM_PEOPLE_SELF_IMAGE_WRITE: BuiltinGroup = BuiltinGroup {
+        name: "idm_people_self_image_write",
+        description: "Builtin IDM Group for people accounts to update their own image.",
+        uuid: UUID_IDM_PEOPLE_SELF_IMAGE_WRITE,
+        members: Vec::with_capacity(0),
+        ..Default::default()
+    };
+
     pub static ref BUILTIN_GROUP_MESSAGE_ADMINS: BuiltinGroup = BuiltinGroup {
         name: "idm_message_admins",
         description: "Builtin Message Administration Group.",

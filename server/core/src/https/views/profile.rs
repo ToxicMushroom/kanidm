@@ -1,3 +1,4 @@
+use crate::Filter;
 use super::constants::{ProfileMenuItems, Urls};
 use super::errors::HtmxError;
 use super::navbar::NavbarCtx;
@@ -8,8 +9,7 @@ use crate::https::views::KanidmHxEventName;
 use crate::https::ServerState;
 use askama::Template;
 use askama_web::WebTemplate;
-
-use axum::extract::{Query, State};
+use axum::extract::{Multipart, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Extension;
 use axum_extra::extract::Form;
@@ -26,6 +26,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use kanidmd_lib::filter::f_eq;
+use kanidmd_lib::prelude::PartialValue;
+use crate::https::v1_oauth2::image_from_multipart;
 
 #[derive(Template, WebTemplate)]
 #[template(path = "user_settings.html")]
@@ -324,4 +327,66 @@ pub(crate) async fn view_new_email_entry_partial(
         },
     )
         .into_response())
+}
+
+
+#[derive(Template, WebTemplate)]
+#[template(
+    ext = "html",
+    source = "\
+(% include \"user_settings/profile_image.html\" %)\
+(% include \"admin/saved_toast.html\" %)\
+"
+)]
+struct AddedImageResponse {
+    image_path: Option<String>,
+}
+
+// pub(crate) async fn remove_image(
+//     State(_state): State<ServerState>,
+//     VerifiedClientInformation(_client_auth_info): VerifiedClientInformation,
+//     Extension(_kopid): Extension<KOpId>,
+//
+// ) -> axum::response::Result<Response> {
+//
+//     let add_email_trigger =
+//         HxResponseTrigger::after_swap([HxEvent::new("dsbr".to_string())]);
+//     Ok((
+//         add_email_trigger,
+//         FormEmailEntryListPartial {
+//             can_edit: true,
+//             value: "".to_string(),
+//             primary: email_query.email_index.is_none(),
+//             index: email_query.email_index.map(|i| i + 1).unwrap_or(0),
+//         },
+//     )
+//         .into_response())
+// }
+
+pub(crate) async fn add_image(
+    State(state): State<ServerState>,
+    VerifiedClientInformation(client_auth_info): VerifiedClientInformation,
+    Extension(kopid): Extension<KOpId>,
+    DomainInfo(domain_info): DomainInfo,
+    mut multipart: Multipart,
+) -> axum::response::Result<Response> {
+    let undroppable = client_auth_info.clone();
+    let uat: &UserAuthToken = undroppable
+        .pre_validated_uat()
+        .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
+
+    let image = image_from_multipart(&mut multipart)
+        .await
+        .map_err(|op_err| WebError::from(op_err))?;
+
+    let f_uuid =
+        filter_all!(f_eq(Attribute::Uuid, PartialValue::Uuid(uat.uuid)));
+    state.qe_w_ref.handle_image_update(client_auth_info, f_uuid, image).await.expect("success");
+
+
+    Ok(
+        AddedImageResponse {
+            image_path: Some(format!("/ui/api/user/{}/image", uat.uuid)),
+        }.into_response()
+    )
 }

@@ -894,6 +894,7 @@ pub static ref SCHEMA_CLASS_PERSON_DL8: SchemaClass = SchemaClass {
         Attribute::UserAuthTokenSession,
         Attribute::OAuth2Session,
         Attribute::Mail,
+        Attribute::Image,
         Attribute::LegalName,
         Attribute::ApplicationPassword,
     ],

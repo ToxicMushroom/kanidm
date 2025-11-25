@@ -15,6 +15,7 @@ use time::OffsetDateTime;
 use url::Url;
 use utoipa::ToSchema;
 use uuid::Uuid;
+use log::debug;
 
 /// A strongly typed ScimEntry that is for transmission to clients. This uses
 /// Kanidm internal strong types for values allowing direct serialisation and
@@ -358,6 +359,14 @@ impl TryFrom<ScimEntryKanidm> for ScimPerson {
                 ScimValueKanidm::EntryReference(v) => Some(v.clone()),
                 _ => None,
             });
+
+        let _image =scim_entry.attrs.get(&Attribute::Image).and_then(|v| match v {
+            ScimValueKanidm::String(url) => Some(url.clone()),
+            a => {
+                debug!("{:?}", a);
+                None
+            },
+        });
 
         Ok(ScimPerson {
             uuid,

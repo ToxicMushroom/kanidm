@@ -1,4 +1,4 @@
-use crate::{handle_client_error, Oauth2Opt, OutputMode};
+use crate::{handle_client_error, ImageOpts, Oauth2Opt, OutputMode};
 use crate::{KanidmClientParser, Oauth2ClaimMapJoin};
 use anyhow::{Context, Error};
 use kanidm_proto::cli::OpType;
@@ -222,11 +222,12 @@ impl Oauth2Opt {
                     Err(e) => handle_client_error(e, opt.output_mode),
                 }
             }
-            Oauth2Opt::SetImage {
-                nopt,
-                path,
-                image_type,
-            } => {
+            Oauth2Opt::SetImage(iopts) => {
+                let ImageOpts {
+                    nopt,
+                    path,
+                    image_type,
+                } = iopts;
                 let img_res: Result<ImageValue, Error> = (move || {
                     let file_name = path
                         .file_name()

@@ -309,6 +309,18 @@ pub struct GraphCommonOpt {
 }
 
 #[derive(Debug, Args, Clone)]
+pub struct ImageOpts {
+    #[clap(flatten)]
+    nopt: Named,
+    #[clap(name = "file-path")]
+    /// A local file path to an image to use as the icon for this OAuth2 client.
+    path: PathBuf,
+    #[clap(name = "image-type")]
+    /// The type of image being uploaded.
+    image_type: Option<ImageType>,
+}
+
+#[derive(Debug, Args, Clone)]
 pub struct AccountCommonOpt {
     #[clap()]
     account_id: String,
@@ -566,6 +578,12 @@ pub enum PersonOpt {
     /// Update a specific person's attributes
     #[clap(name = "update")]
     Update(PersonUpdateOpt),
+    /// The image presented on the Kanidm Apps Listing page for an OAuth2 resource server.
+    #[clap(name = "set-image")]
+    SetImage(ImageOpts),
+    /// Removes the custom image previously set.
+    #[clap(name = "remove-image")]
+    RemoveImage(Named),
     /// Create a new person's account
     #[clap(name = "create")]
     Create(AccountCreateOpt),
@@ -765,21 +783,13 @@ pub enum SessionOpt {
 #[derive(Debug, Subcommand, Clone)]
 pub enum RawOpt {
     #[clap(name = "search")]
-    Search {
-        filter: ScimFilter
-    },
+    Search { filter: ScimFilter },
     #[clap(name = "create")]
-    Create {
-        file: PathBuf
-    },
+    Create { file: PathBuf },
     #[clap(name = "update")]
-    Update {
-        file: PathBuf
-    },
+    Update { file: PathBuf },
     #[clap(name = "delete")]
-    Delete {
-        id: String
-    },
+    Delete { id: String },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -960,16 +970,7 @@ pub enum Oauth2Opt {
     },
     /// The image presented on the Kanidm Apps Listing page for an OAuth2 resource server.
     #[clap(name = "set-image")]
-    SetImage {
-        #[clap(flatten)]
-        nopt: Named,
-        #[clap(name = "file-path")]
-        /// A local file path to an image to use as the icon for this OAuth2 client.
-        path: PathBuf,
-        #[clap(name = "image-type")]
-        /// The type of image being uploaded.
-        image_type: Option<ImageType>,
-    },
+    SetImage(ImageOpts),
     /// Removes the custom image previously set.
     #[clap(name = "remove-image")]
     RemoveImage(Named),
@@ -1159,22 +1160,18 @@ pub enum MessageOpt {
 
     #[clap(name = "get")]
     /// Display the message identified by its message ID.
-    Get {
-        message_id: Uuid
-    },
+    Get { message_id: Uuid },
 
     #[clap(name = "mark-as-sent")]
     /// Mark the message with this message ID as sent. This will prevent it
     /// being sent by any mail sender.
-    MarkAsSent {
-        message_id: Uuid
-    },
+    MarkAsSent { message_id: Uuid },
 
     #[clap(name = "send-test-message")]
     SendTestMessage {
         /// The account name of the person who this message should be sent to.
         to: String,
-    }
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]

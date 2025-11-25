@@ -37,7 +37,7 @@ use kanidm_proto::constants::{
 use kanidm_proto::internal::*;
 use kanidm_proto::v1::*;
 use reqwest::cookie::{CookieStore, Jar};
-use reqwest::Response;
+use reqwest::{Response, multipart};
 pub use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -198,6 +198,25 @@ fn read_file_metadata<P: AsRef<Path>>(path: &P) -> Result<Metadata, ()> {
             e
         );
     })
+}
+
+/// Tries to construct a multipart part from the imagevalue
+fn try_part_from_imagevalue(image: ImageValue) -> Result<multipart::Part, ClientError> {
+    let file_content_type = image.filetype.as_content_type_str();
+    
+    match multipart::Part::bytes(image.contents.clone())
+        .file_name(image.filename)
+        .mime_str(file_content_type)
+    {
+        Ok(part) => Ok(part),
+        Err(err) => {
+            error!(
+                "Failed to generate multipart body from image data: {:}",
+                err
+            );
+            Err(ClientError::SystemError)
+        }
+    }
 }
 
 impl KanidmClientBuilder {
@@ -728,9 +747,9 @@ impl KanidmClient {
         dest: &str,
         request: &R,
     ) -> Result<T, ClientError> {
-        let response = self.client.post(self.make_url(dest)).json(request);
+        let request = self.client.post(self.make_url(dest)).json(request);
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;
@@ -755,30 +774,30 @@ impl KanidmClient {
 
         let auth_url = self.make_url(dest);
 
-        let response = self.client.post(auth_url.clone()).json(&request);
+        let request = self.client.post(auth_url.clone()).json(&request);
 
         // If we have a bearer token, set it now.
-        let response = {
+        let request = {
             let tguard = self.bearer_token.read().await;
             if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
+                request.bearer_auth(token)
             } else {
-                response
+                request
             }
         };
 
         // If we have a session header, set it now. This is only used when connecting
         // to an older server.
-        let response = {
+        let request = {
             let sguard = self.auth_session_id.read().await;
             if let Some(sessionid) = &(*sguard) {
-                response.header(KSESSIONID, sessionid)
+                request.header(KSESSIONID, sessionid)
             } else {
-                response
+                request
             }
         };
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;
@@ -832,23 +851,56 @@ impl KanidmClient {
             .map_err(|e| ClientError::JsonDecode(e, opid))
     }
 
+    pub async fn perform_multipart_post_request<T: DeserializeOwned>(
+        &self,
+        dest: &str,
+        form: reqwest::multipart::Form,
+    ) -> Result<T, ClientError> {
+        let request = self.client.post(self.make_url(dest))
+            .multipart(form);
+
+        let request = {
+            let tguard = self.bearer_token.read().await;
+            if let Some(token) = &(*tguard) {
+                request.bearer_auth(token)
+            } else {
+                request
+            }
+        };
+
+        let response = request
+            .send()
+            .await
+            .map_err(|err| self.handle_response_error(err))?;
+
+        self.expect_version(&response).await;
+
+        let opid = self.get_kopid_from_response(&response);
+
+        self.ok_or_clienterror(&opid, response)
+            .await?
+            .json()
+            .await
+            .map_err(|e| ClientError::JsonDecode(e, opid))
+    }
+    
     pub async fn perform_post_request<R: Serialize, T: DeserializeOwned>(
         &self,
         dest: &str,
         request: R,
     ) -> Result<T, ClientError> {
-        let response = self.client.post(self.make_url(dest)).json(&request);
+        let request = self.client.post(self.make_url(dest)).json(&request);
 
-        let response = {
+        let request = {
             let tguard = self.bearer_token.read().await;
             if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
+                request.bearer_auth(token)
             } else {
-                response
+                request
             }
         };
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;
@@ -869,18 +921,18 @@ impl KanidmClient {
         dest: &str,
         request: R,
     ) -> Result<T, ClientError> {
-        let response = self.client.put(self.make_url(dest)).json(&request);
+        let request = self.client.put(self.make_url(dest)).json(&request);
 
-        let response = {
+        let request = {
             let tguard = self.bearer_token.read().await;
             if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
+                request.bearer_auth(token)
             } else {
-                response
+                request
             }
         };
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;
@@ -931,18 +983,18 @@ impl KanidmClient {
         dest: &str,
         request: R,
     ) -> Result<T, ClientError> {
-        let response = self.client.patch(self.make_url(dest)).json(&request);
+        let request = self.client.patch(self.make_url(dest)).json(&request);
 
-        let response = {
+        let request = {
             let tguard = self.bearer_token.read().await;
             if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
+                request.bearer_auth(token)
             } else {
-                response
+                request
             }
         };
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;
@@ -983,17 +1035,17 @@ impl KanidmClient {
             }
         }
 
-        let response = self.client.get(dest_url);
-        let response = {
+        let request = self.client.get(dest_url);
+        let request = {
             let tguard = self.bearer_token.read().await;
             if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
+                request.bearer_auth(token)
             } else {
-                response
+                request
             }
         };
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;
@@ -1010,22 +1062,22 @@ impl KanidmClient {
     }
 
     async fn perform_delete_request(&self, dest: &str) -> Result<(), ClientError> {
-        let response = self
+        let request = self
             .client
             .delete(self.make_url(dest))
             // empty-ish body that makes the parser happy
             .json(&serde_json::json!([]));
 
-        let response = {
+        let request = {
             let tguard = self.bearer_token.read().await;
             if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
+                request.bearer_auth(token)
             } else {
-                response
+                request
             }
         };
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;
@@ -1046,18 +1098,18 @@ impl KanidmClient {
         dest: &str,
         request: R,
     ) -> Result<(), ClientError> {
-        let response = self.client.delete(self.make_url(dest)).json(&request);
+        let request = self.client.delete(self.make_url(dest)).json(&request);
 
-        let response = {
+        let request = {
             let tguard = self.bearer_token.read().await;
             if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
+                request.bearer_auth(token)
             } else {
-                response
+                request
             }
         };
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;
@@ -1523,18 +1575,18 @@ impl KanidmClient {
     }
 
     pub async fn whoami(&self) -> Result<Option<Entry>, ClientError> {
-        let response = self.client.get(self.make_url("/v1/self"));
+        let request = self.client.get(self.make_url("/v1/self"));
 
-        let response = {
+        let request = {
             let tguard = self.bearer_token.read().await;
             if let Some(token) = &(*tguard) {
-                response.bearer_auth(token)
+                request.bearer_auth(token)
             } else {
-                response
+                request
             }
         };
 
-        let response = response
+        let response = request
             .send()
             .await
             .map_err(|err| self.handle_response_error(err))?;

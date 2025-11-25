@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
 use kanidm_proto::constants::*;
-use kanidm_proto::internal::{CredentialStatus, IdentifyUserRequest, IdentifyUserResponse};
+use kanidm_proto::internal::{CredentialStatus, IdentifyUserRequest, IdentifyUserResponse, ImageValue};
 use kanidm_proto::v1::{AccountUnixExtend, Entry, SingleStringRequest, UatStatus};
+use reqwest::multipart;
 use uuid::Uuid;
 
-use crate::{ClientError, KanidmClient};
+use crate::{ClientError, KanidmClient, try_part_from_imagevalue};
 
 impl KanidmClient {
     pub async fn idm_person_account_list(&self) -> Result<Vec<Entry>, ClientError> {
@@ -220,6 +221,23 @@ impl KanidmClient {
             request,
         )
         .await
+    }
+    
+    pub async fn idm_person_delete_image(&self, id: &str) -> Result<(), ClientError> {
+        self.perform_delete_request(format!("/v1/person/{id}/_image").as_str())
+            .await
+    }
+
+    pub async fn idm_person_update_image(
+        &self,
+        id: &str,
+        image: ImageValue,
+    ) -> Result<(), ClientError> {
+        let form = multipart::Form::new().part("image", try_part_from_imagevalue(image)?);
+
+        // send it
+        self.perform_multipart_post_request(format!("/v1/person/{id}/_image").as_str(), form)
+            .await
     }
 
     pub async fn idm_account_radius_credential_get(
