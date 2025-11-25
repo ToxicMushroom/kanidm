@@ -1,12 +1,13 @@
-use crate::Filter;
 use super::constants::{ProfileMenuItems, Urls};
 use super::errors::HtmxError;
 use super::navbar::NavbarCtx;
 use crate::https::errors::WebError;
 use crate::https::extractors::{DomainInfo, VerifiedClientInformation};
 use crate::https::middleware::KOpId;
+use crate::https::v1_oauth2::image_from_multipart;
 use crate::https::views::KanidmHxEventName;
 use crate::https::ServerState;
+use crate::Filter;
 use askama::Template;
 use askama_web::WebTemplate;
 use axum::extract::{Multipart, Query, State};
@@ -20,15 +21,14 @@ use kanidm_proto::internal::{OperationError, UserAuthToken};
 use kanidm_proto::scim_v1::client::ScimEntryPutKanidm;
 use kanidm_proto::scim_v1::server::{ScimEffectiveAccess, ScimPerson, ScimValueKanidm};
 use kanidm_proto::scim_v1::ScimMail;
+use kanidmd_lib::filter::f_eq;
+use kanidmd_lib::prelude::PartialValue;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use kanidmd_lib::filter::f_eq;
-use kanidmd_lib::prelude::PartialValue;
-use crate::https::v1_oauth2::image_from_multipart;
 
 #[derive(Template, WebTemplate)]
 #[template(path = "user_settings.html")]
@@ -329,7 +329,6 @@ pub(crate) async fn view_new_email_entry_partial(
         .into_response())
 }
 
-
 #[derive(Template, WebTemplate)]
 #[template(
     ext = "html",
@@ -377,16 +376,17 @@ pub(crate) async fn add_image(
 
     let image = image_from_multipart(&mut multipart)
         .await
-        .map_err(|op_err| WebError::from(op_err))?;
+        .map_err(WebError::from)?;
 
-    let f_uuid =
-        filter_all!(f_eq(Attribute::Uuid, PartialValue::Uuid(uat.uuid)));
-    state.qe_w_ref.handle_image_update(client_auth_info, f_uuid, image).await.expect("success");
+    let f_uuid = filter_all!(f_eq(Attribute::Uuid, PartialValue::Uuid(uat.uuid)));
+    state
+        .qe_w_ref
+        .handle_image_update(client_auth_info, f_uuid, image)
+        .await
+        .map_err(WebError::from)?;
 
-
-    Ok(
-        AddedImageResponse {
-            image_path: Some(format!("/ui/api/user/{}/image", uat.uuid)),
-        }.into_response()
-    )
+    Ok(AddedImageResponse {
+        image_path: Some(format!("/ui/api/user/{}/image", uat.uuid)),
+    }
+    .into_response())
 }

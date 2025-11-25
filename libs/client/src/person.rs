@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 
 use kanidm_proto::constants::*;
-use kanidm_proto::internal::{CredentialStatus, IdentifyUserRequest, IdentifyUserResponse, ImageValue};
+use kanidm_proto::internal::{
+    CredentialStatus, IdentifyUserRequest, IdentifyUserResponse, ImageValue,
+};
 use kanidm_proto::v1::{AccountUnixExtend, Entry, SingleStringRequest, UatStatus};
 use reqwest::multipart;
 use uuid::Uuid;
 
-use crate::{ClientError, KanidmClient, try_part_from_imagevalue};
+use crate::{try_part_from_imagevalue, ClientError, KanidmClient};
 
 impl KanidmClient {
     pub async fn idm_person_account_list(&self) -> Result<Vec<Entry>, ClientError> {
@@ -222,7 +224,7 @@ impl KanidmClient {
         )
         .await
     }
-    
+
     pub async fn idm_person_delete_image(&self, id: &str) -> Result<(), ClientError> {
         self.perform_delete_request(format!("/v1/person/{id}/_image").as_str())
             .await

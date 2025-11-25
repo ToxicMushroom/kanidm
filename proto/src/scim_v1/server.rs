@@ -5,6 +5,7 @@ use crate::attribute::Attribute;
 use crate::internal::UiHint;
 use crate::v1::OutboundMessage;
 use crypto_glue::s256::Sha256Output;
+use log::debug;
 use scim_proto::ScimEntryHeader;
 use serde::Serialize;
 use serde_with::{base64, formats, hex::Hex, serde_as, skip_serializing_none};
@@ -15,7 +16,6 @@ use time::OffsetDateTime;
 use url::Url;
 use utoipa::ToSchema;
 use uuid::Uuid;
-use log::debug;
 
 /// A strongly typed ScimEntry that is for transmission to clients. This uses
 /// Kanidm internal strong types for values allowing direct serialisation and
@@ -360,13 +360,16 @@ impl TryFrom<ScimEntryKanidm> for ScimPerson {
                 _ => None,
             });
 
-        let _image =scim_entry.attrs.get(&Attribute::Image).and_then(|v| match v {
-            ScimValueKanidm::String(url) => Some(url.clone()),
-            a => {
-                debug!("{:?}", a);
-                None
-            },
-        });
+        let _image = scim_entry
+            .attrs
+            .get(&Attribute::Image)
+            .and_then(|v| match v {
+                ScimValueKanidm::String(url) => Some(url.clone()),
+                a => {
+                    debug!("{:?}", a);
+                    None
+                }
+            });
 
         Ok(ScimPerson {
             uuid,

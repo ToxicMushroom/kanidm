@@ -508,7 +508,7 @@ pub(crate) async fn oauth2_id_image_post(
     // because we might not get an image
     let image = image_from_multipart(&mut multipart)
         .await
-        .map_err(|op_err| WebError::from(op_err))?;
+        .map_err(WebError::from)?;
 
     match image {
         Some(image) => {

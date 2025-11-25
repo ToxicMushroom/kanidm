@@ -147,10 +147,7 @@ pub fn view_router(state: ServerState) -> Router<ServerState> {
         )
         .route("/api/cu_cancel", post(reset::cancel_cred_update))
         .route("/api/cu_commit", post(reset::commit))
-        .route(
-            "/api/user_settings/add_image",
-            post(profile::add_image),
-        )
+        .route("/api/user_settings/add_image", post(profile::add_image))
         // .route(
         //     "/api/user_settings/remove_image",
         //     post(profile::remove_image),

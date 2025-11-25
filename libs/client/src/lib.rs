@@ -37,8 +37,8 @@ use kanidm_proto::constants::{
 use kanidm_proto::internal::*;
 use kanidm_proto::v1::*;
 use reqwest::cookie::{CookieStore, Jar};
-use reqwest::{Response, multipart};
 pub use reqwest::StatusCode;
+use reqwest::{multipart, Response};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::error::Error as SerdeJsonError;
@@ -203,7 +203,7 @@ fn read_file_metadata<P: AsRef<Path>>(path: &P) -> Result<Metadata, ()> {
 /// Tries to construct a multipart part from the imagevalue
 fn try_part_from_imagevalue(image: ImageValue) -> Result<multipart::Part, ClientError> {
     let file_content_type = image.filetype.as_content_type_str();
-    
+
     match multipart::Part::bytes(image.contents.clone())
         .file_name(image.filename)
         .mime_str(file_content_type)
@@ -856,8 +856,7 @@ impl KanidmClient {
         dest: &str,
         form: reqwest::multipart::Form,
     ) -> Result<T, ClientError> {
-        let request = self.client.post(self.make_url(dest))
-            .multipart(form);
+        let request = self.client.post(self.make_url(dest)).multipart(form);
 
         let request = {
             let tguard = self.bearer_token.read().await;
@@ -883,7 +882,7 @@ impl KanidmClient {
             .await
             .map_err(|e| ClientError::JsonDecode(e, opid))
     }
-    
+
     pub async fn perform_post_request<R: Serialize, T: DeserializeOwned>(
         &self,
         dest: &str,
