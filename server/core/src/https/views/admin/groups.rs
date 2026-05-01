@@ -60,6 +60,7 @@ struct GroupView {
 struct GroupViewPartial {
     group: ScimGroup,
     can_rw: bool,
+    can_modify_any_attr: bool,
     scim_effective_access: ScimEffectiveAccess,
 }
 
@@ -97,10 +98,14 @@ pub(crate) async fn view_group_view_get(
         .map_err(|op_err| HtmxError::new(&kopid, op_err, domain_info.clone()))?;
 
     let can_rw = uat_privileges_active(uat);
+    let can_modify_any_attr = scim_effective_access
+        .modify_present
+        .check_any(&std::collections::BTreeSet::from(GROUP_ATTRIBUTES));
 
     let group_partial = GroupViewPartial {
         group,
         can_rw,
+        can_modify_any_attr,
         scim_effective_access,
     };
 
